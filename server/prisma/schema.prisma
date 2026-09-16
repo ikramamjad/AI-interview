@@ -1,0 +1,125 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Organization {
+  id         String      @id @default(cuid())
+  name       String
+  createdAt  DateTime    @default(now())
+  recruiters Recruiter[]
+  campaigns  Campaign[]
+}
+
+model Recruiter {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  email          String       @unique
+  passwordHash   String
+  role           String       @default("recruiter")
+  createdAt      DateTime     @default(now())
+  campaigns      Campaign[]
+}
+
+model Candidate {
+  id           String             @id @default(cuid())
+  name         String
+  email        String             @unique
+  passwordHash String?
+  authProvider String?            @default("email")
+  resumeUrl    String?
+  profile      Json?
+  createdAt    DateTime           @default(now())
+  sessions     InterviewSession[]
+}
+
+model Campaign {
+  id                  String             @id @default(cuid())
+  organizationId      String
+  organization        Organization       @relation(fields: [organizationId], references: [id])
+  recruiterId         String
+  recruiter           Recruiter          @relation(fields: [recruiterId], references: [id])
+  name                String
+  role                String
+  difficulty          String
+  targetQuestionCount Int                @default(8)
+  focusAreas          String[]
+  inviteToken         String             @unique
+  createdAt           DateTime           @default(now())
+  sessions            InterviewSession[]
+}
+
+model InterviewSession {
+  id                  String           @id @default(cuid())
+  campaignId          String?
+  campaign            Campaign?        @relation(fields: [campaignId], references: [id])
+  candidateId         String
+  candidate           Candidate        @relation(fields: [candidateId], references: [id])
+  role                String
+  difficulty          String
+  status              String           @default("in_progress")
+  terminationReason   String?
+  targetQuestionCount Int              @default(8)
+  profileSnapshot     Json
+  consentGivenAt      DateTime?
+  consentVersion      String?
+  startedAt           DateTime         @default(now())
+  endedAt             DateTime?
+  transcript          TranscriptTurn[]
+  violations          Violation[]
+  report              InterviewReport?
+
+  @@index([candidateId])
+  @@index([campaignId])
+  @@index([status])
+}
+
+model TranscriptTurn {
+  id               String           @id @default(cuid())
+  sessionId        String
+  session          InterviewSession @relation(fields: [sessionId], references: [id])
+  role             String
+  text             String
+  topic            String?
+  questionType     String?
+  suspicionFlag    Boolean          @default(false)
+  suspicionReason  String?
+  difficultyAdjust String?
+  createdAt        DateTime         @default(now())
+
+  @@index([sessionId])
+}
+
+model Violation {
+  id                  String           @id @default(cuid())
+  sessionId           String
+  session             InterviewSession @relation(fields: [sessionId], references: [id])
+  type                String
+  actionTaken         String
+  evidenceUrl         String?
+  reviewedByRecruiter Boolean          @default(false)
+  reviewDecision      String?
+  reviewedAt          DateTime?
+  createdAt           DateTime         @default(now())
+
+  @@index([sessionId])
+  @@index([type])
+}
+
+model InterviewReport {
+  id              String           @id @default(cuid())
+  sessionId       String           @unique
+  session         InterviewSession @relation(fields: [sessionId], references: [id])
+  overallScore    Int?
+  strengths       String[]
+  weaknesses      String[]
+  summary         String?
+  recommendedNext String?
+  createdAt       DateTime         @default(now())
+}
